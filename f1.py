@@ -9,6 +9,5 @@ def f1(x, z):
       pp = 20
   else:
       pp = 5
-  concolic.guard(concolic.get('y') >= 0)
   return y
 
