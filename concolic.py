@@ -130,7 +130,7 @@ def run(func, vars):
 		finally:
 			print("... Path collected: %s" % current_path)
 			# print("Path Record: %s" % path_record)
-
+        
 
 
 		# Figure out the next guard to negate
