@@ -7,13 +7,10 @@ def replaceVarWithConcolicGet(expr):
         return ast.Call(func=ast.Attribute(value=ast.Name(id='concolic', ctx=ast.Load()), attr='get', ctx=ast.Load()), args=[ast.Constant(value = expr.id)], keywords=[])
     elif isinstance(expr, ast.Constant):
         return ast.Constant(expr.value)
-    elif isinstance(expr, ast.NamedExpr):
-        print("named expression: " + ast.dump(expr))
     elif isinstance(expr, ast.BoolOp):
         values = []
         for x in expr.values:
             values.append(replaceVarWithConcolicGetGuard(x))
-        print("OPERATION:  " + ast.dump(expr.op))
         if isinstance(expr.op, ast.And):
             return ast.Call(func=ast.Attribute(value=ast.Name(id='z3', ctx=ast.Load()), attr='And', ctx=ast.Load()), args=values, keywords=[])
         else:
@@ -47,13 +44,10 @@ def replaceVarWithConcolicGetGuard(expr):
         return ast.Call(func=ast.Attribute(value=ast.Name(id='concolic', ctx=ast.Load()), attr='get', ctx=ast.Load()), args=[ast.Constant(value = expr.id)], keywords=[])
     elif isinstance(expr, ast.Constant):
         return ast.Constant(expr.value)
-    elif isinstance(expr, ast.NamedExpr):
-        print("named expression: " + ast.dump(expr))
     elif isinstance(expr, ast.BoolOp):
         values = []
         for x in expr.values:
             values.append(replaceVarWithConcolicGetGuard(x))
-        print("OPERATION:  " + ast.dump(expr.op))
         if isinstance(expr.op, ast.And):
             return ast.Call(func=ast.Attribute(value=ast.Name(id='z3', ctx=ast.Load()), attr='And', ctx=ast.Load()), args=values, keywords=[])
         else:
@@ -61,7 +55,6 @@ def replaceVarWithConcolicGetGuard(expr):
     elif isinstance(expr, ast.BinOp):
         left = replaceVarWithConcolicGetGuard(expr.left)
         right = replaceVarWithConcolicGetGuard(expr.right)
-        print('binop ' )
         return ast.BinOp(left, expr.op, right)
     elif isinstance(expr, ast.UnaryOp):
         ex = replaceVarWithConcolicGetGuard(expr.operand)
@@ -86,7 +79,6 @@ def insertConcolicOnFunction(function):
     i = 0
     while i < len(function):
         node = function[i]
-        print("pp hard: " + ast.dump(node))
         if isinstance(node, ast.If):
             guard = replaceVarWithConcolicGetGuard(node.test)
             guardCall = ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='concolic', ctx=ast.Load()), attr='guard', ctx=ast.Load()), args=[guard], keywords=[]))
@@ -111,12 +103,9 @@ def insertConcolicOnFunction(function):
                 toAssign = replaceVarWithConcolicGet(node.value)
                 for toAssignVar in node.targets:
                     if isinstance(toAssignVar, ast.Name):
-                        print('varname: ' + '\'' + str(toAssignVar.id) + '\'')
-                        toAssignExpr = ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='concolic', ctx=ast.Load()), attr='set', ctx=ast.Load()), args=[ast.Constant(toAssignVar.id), node.value], keywords=[]))
+                        toAssignExpr = ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='concolic', ctx=ast.Load()), attr='set', ctx=ast.Load()), args=[ast.Constant(toAssignVar.id), toAssign], keywords=[]))
                         function.insert(function.index(node)+1,toAssignExpr)
                    #     i
-                    else:
-                        print(ast.dump(toAssignVar))
         elif isinstance(node, ast.Assert):
             assertGuard = ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='concolic', ctx=ast.Load()), attr='guard', ctx=ast.Load()), args=[replaceVarWithConcolicGetGuard(node.test)], keywords=[]))
             function.insert(function.index(node)+1, assertGuard)
@@ -127,6 +116,7 @@ toRead = ''
 shouldWrite = False
 toWrite = ''
 isFileOut = False;
+
 for x in sys.argv:
     if isFile:
         toRead = x
@@ -137,20 +127,19 @@ for x in sys.argv:
         shouldWrite = True
     if x == '-f': #write to file after this
         isFileOut = True
-    if isFileOut:
+    elif isFileOut:
         toWrite = x
         isFileOut = False
 splitFile = toRead.split('.')
-assert(len(splitFile) == 2 and splitFile[1] == 'py' and len(splitFile[0]) > 0 , "Not a valid python filename for input!")
+#assert(len(splitFile) == 2 and splitFile[1] == 'py' and len(splitFile[0]) > 0 , "Not a valid python filename for input!")
 
 
 
 if toWrite == '' and shouldWrite:
     toWrite = ''.join(splitFile[0] + "-concolic.py")
-    print(toWrite)
     
 splitFile = toWrite.split('.')
-assert(len(splitFile) == 2 and splitFile[1] == 'py' and len(splitFile[0]) > 0 , "Not a valid python filename for input!")
+#assert(len(splitFile) == 2 and splitFile[1] == 'py' and len(splitFile[0]) > 0 , "Not a valid python filename for input!")
 
 if toRead != '':
     with open(toRead, "r") as source:
@@ -158,13 +147,20 @@ if toRead != '':
         tree = ast.parse(code)
         code1 = compile(tree, filename="", mode="exec")
         print(astor.to_source(tree))
+        module = None
         for node in ast.walk(tree):
+            if isinstance(node, ast.Module):
+                module = node
             if isinstance(node, ast.FunctionDef):
                 insertConcolicOnFunction(node.body)
-        print('/n/n/n')
-        print(astor.to_source(tree))
-        print('\n\n' + str(sys.argv))
+                print("args: " + ast.dump(node.args))
+                args = []
+                for arg in node.args.args:
+                    args.append(arg.arg)
     f = open(toWrite, "w")
     f.write(astor.to_source(tree))
     f.close()
     
+    
+
+

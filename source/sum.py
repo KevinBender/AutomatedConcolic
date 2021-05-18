@@ -4,7 +4,6 @@ import z3, concolic
 def sum(x):
     i = 0
     r = 0
-    z3.Not()
     if x > 0 and x <= 5:
         while i < x:
             i = i + 1
